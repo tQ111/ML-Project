@@ -55,17 +55,25 @@ fig.add_trace(go.Candlestick(
     low=chart_data['Low'],
     close=chart_data['Close'],
     name='SPY',
-    increasing_line_width=1,
-    decreasing_line_width=1,
+    increasing_line_color='#26a69a',
+    decreasing_line_color='#ef5350',
+    increasing_fillcolor='#26a69a',
+    decreasing_fillcolor='#ef5350',
 ))
+
+# treat dates as categories instead of a continuous timeline - removes weekend/holiday gaps and widens candles
+fig.update_xaxes(type='category', nticks=15)
+
+# small fixed-dollar offset instead of percentage, so markers stay close regardless of price level
+offset = chart_data['Close'].mean() * 0.004
 
 # mark where model predicted "good long"
 buy_signals = chart_data[chart_data['long_pred'] == 1]
 fig.add_trace(go.Scatter(
     x=buy_signals['Date'],
-    y=buy_signals['Low'] * 0.98,
+    y=buy_signals['Low'] - offset,
     mode='markers',
-    marker=dict(symbol='triangle-up', size=6, color='lime'),
+    marker=dict(symbol='triangle-up', size=11, color='#26a69a', line=dict(width=1, color='white')),
     name='Model says: Long'
 ))
 
@@ -73,9 +81,9 @@ fig.add_trace(go.Scatter(
 sell_signals = chart_data[chart_data['short_pred'] == 1]
 fig.add_trace(go.Scatter(
     x=sell_signals['Date'],
-    y=sell_signals['High'] * 1.02,
+    y=sell_signals['High'] + offset,
     mode='markers',
-    marker=dict(symbol='triangle-down', size=6, color='red'),
+    marker=dict(symbol='triangle-down', size=11, color='#ef5350', line=dict(width=1, color='white')),
     name='Model says: Short'
 ))
 
@@ -83,24 +91,24 @@ fig.add_trace(go.Scatter(
 long_wins = chart_data[(chart_data['long_pred'] == 1) & (chart_data['long_outcome'] == 'take_profit')]
 long_losses = chart_data[(chart_data['long_pred'] == 1) & (chart_data['long_outcome'] != 'take_profit')]
 fig.add_trace(go.Scatter(
-    x=long_wins['Date'], y=long_wins['High'] * 1.015,
-    mode='markers', marker=dict(symbol='circle', size=6, color='springgreen'),
+    x=long_wins['Date'], y=long_wins['High'] + offset * 1.8,
+    mode='markers', marker=dict(symbol='circle', size=9, color='#26a69a', line=dict(width=1, color='white')),
     name='Long: Won'
 ))
 fig.add_trace(go.Scatter(
-    x=long_losses['Date'], y=long_losses['High'] * 1.015,
-    mode='markers', marker=dict(symbol='x', size=6, color='gray'),
+    x=long_losses['Date'], y=long_losses['High'] + offset * 1.8,
+    mode='markers', marker=dict(symbol='x', size=9, color='#787b86'),
     name='Long: Lost/Timed Out'
 ))
 
 fig.update_layout(
-    title='SPY Price with Long Signals (Test Period)',
+    title='SPY Price with Long/Short Signals (Test Period)',
     xaxis_rangeslider_visible=False,
     template='plotly_dark',
     dragmode='zoom',
-    xaxis=dict(rangeslider=dict(visible=False), fixedrange=False),
-    yaxis=dict(fixedrange=False),
+    hovermode='closest',
 )
+
 fig.update_layout(hovermode='x unified')
 fig.write_html("chart.html", config={'scrollZoom': True})
 print("Saved chart.html")

@@ -22,18 +22,14 @@ test_df = df.iloc[split_index:].copy().reset_index(drop=True)
 
 X_train = train_df[feature_cols]
 
-y_train_long = train_df['long_good']
-scale_long = (y_train_long == 0).sum() / (y_train_long == 1).sum()
-long_model = xgb.XGBClassifier(n_estimators=100, max_depth=3, learning_rate=0.1, scale_pos_weight=scale_long)
-long_model.fit(X_train, y_train_long)
+long_model = xgb.XGBRegressor(n_estimators=100, max_depth=3, learning_rate=0.1)
+long_model.fit(X_train, train_df['long_return_pct'])
+test_df['long_pred_return'] = long_model.predict(test_df[feature_cols])
 
-y_train_short = train_df['short_good']
-scale_short = (y_train_short == 0).sum() / (y_train_short == 1).sum()
-short_model = xgb.XGBClassifier(n_estimators=100, max_depth=3, learning_rate=0.1, scale_pos_weight=scale_short)
-short_model.fit(X_train, y_train_short)
-
-test_df['long_pred'] = long_model.predict(test_df[feature_cols])
-test_df['short_pred'] = short_model.predict(test_df[feature_cols])
+# only trade the top 10% most confident long predictions
+long_threshold = test_df['long_pred_return'].quantile(0.90)
+test_df['long_pred'] = (test_df['long_pred_return'] >= long_threshold).astype(int)
+test_df['short_pred'] = 0  # not trading shorts for now, per the findings above
 
 # map test_df dates back to indices in the full price data, since the backtester needs real OHLC lookahead
 data_dates = data['Date'].tolist()
@@ -47,20 +43,23 @@ slippage_pct = 0.0005
 
 capital = starting_capital
 equity_curve = []
-in_position = False
-position_exit_date_index = -1
+open_positions = []  # list of {exit_index, pnl} for trades not yet resolved
 trades_taken = 0
+max_concurrent_positions = 5  # cap total simultaneous trades
+position_size_pct = 0.15  # smaller per-trade size since multiple can be open at once
 
 for _, row in test_df.iterrows():
     current_date = row['date']
     current_data_index = date_to_index[current_date]
 
-    # if currently in a position, check if it's resolved by now
-    if in_position and current_data_index < position_exit_date_index:
-        equity_curve.append({'date': current_date, 'capital': capital})
-        continue  # skip, still holding, no new trade allowed
-
-    in_position = False  # previous trade has resolved by this point
+    # resolve and apply any positions whose exit day has arrived
+    still_open = []
+    for pos in open_positions:
+        if current_data_index >= pos['exit_index']:
+            capital += pos['pnl']
+        else:
+            still_open.append(pos)
+    open_positions = still_open
 
     direction = None
     if row['long_pred'] == 1:
@@ -68,17 +67,18 @@ for _, row in test_df.iterrows():
     elif row['short_pred'] == 1:
         direction = 'short'
 
-    if direction is not None:
+    if direction is not None and len(open_positions) < max_concurrent_positions:
         result = simulate_trade(data, entry_index=current_data_index, direction=direction,
                                   stop_loss_pct=0.03, take_profit_pct=0.03, max_hold_days=15)
         net_return_pct = result['return_pct'] - (slippage_pct * 2)
         position_value = capital * position_size_pct
         pnl = (position_value * net_return_pct) - commission_per_trade
-        capital += pnl
-        trades_taken += 1
 
-        in_position = True
-        position_exit_date_index = current_data_index + result['days_held']
+        open_positions.append({
+            'exit_index': current_data_index + result['days_held'],
+            'pnl': pnl
+        })
+        trades_taken += 1
 
     equity_curve.append({'date': current_date, 'capital': capital})
 
