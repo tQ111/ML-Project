@@ -1,20 +1,16 @@
 from flask import Flask, request, jsonify
 import os
 import json
-import time
 import threading
-from datetime import datetime, timedelta
-import requests
+from datetime import datetime, timezone
 import pandas as pd
 import numpy as np
 from xgboost import XGBClassifier
 
 app = Flask(__name__)
 
-POLYGON_API_KEY = os.environ.get("POLYGON_API_KEY")
 LOG_FILE = "signals_log.jsonl"
 
-# load trained models once at startup
 model_long = XGBClassifier()
 model_long.load_model("model_long_intraday.json")
 model_short = XGBClassifier()
@@ -28,9 +24,11 @@ FEATURE_COLS = [
     'candle_dir', 'high_low_range', 'rsi_14', 'ut_direction', 'adx_proxy'
 ]
 
-# in-memory open positions: {position_id: {direction, entry_time, entry_price}}
-open_positions = {}
-positions_lock = threading.Lock()
+MAX_BUFFER = 200  # enough bars for all rolling features
+
+bar_buffer = []          # list of dicts: datetime, Open, High, Low, Close, Volume
+open_positions = {}      # pos_id -> {direction, entry_time, entry_price, bars_held}
+data_lock = threading.Lock()
 
 
 def log_event(record):
@@ -39,25 +37,7 @@ def log_event(record):
     print(record)
 
 
-def fetch_recent_bars(minutes_back=200):
-    """Pull recent 5-min SPY bars from Polygon, enough history to compute all features."""
-    end = datetime.utcnow()
-    start = end - timedelta(minutes=minutes_back)
-    url = f"https://api.polygon.io/v2/aggs/ticker/SPY/range/5/minute/{start.strftime('%Y-%m-%d')}/{end.strftime('%Y-%m-%d')}"
-    params = {"adjusted": "true", "sort": "asc", "limit": 100, "apiKey": POLYGON_API_KEY}
-    r = requests.get(url, params=params)
-    data = r.json()
-    if "results" not in data:
-        return None
-    df = pd.DataFrame(data["results"])
-    df['datetime'] = pd.to_datetime(df['t'], unit='ms')
-    df = df.rename(columns={'o': 'Open', 'h': 'High', 'l': 'Low', 'c': 'Close', 'v': 'Volume'})
-    df = df[['datetime', 'Open', 'High', 'Low', 'Close', 'Volume']]
-    return df.reset_index(drop=True)
-
-
 def build_live_features(df):
-    """Same feature logic as build_features_intraday.py, applied to live data."""
     features = pd.DataFrame()
     features['datetime'] = df['datetime']
 
@@ -85,6 +65,7 @@ def build_live_features(df):
     features['atr10'] = atr10 / df['Close']
     features['atr_ratio'] = atr10 / tr.rolling(20).mean()
 
+    df = df.copy()
     df['date'] = df['datetime'].dt.date
     df['tp'] = (df['High'] + df['Low'] + df['Close']) / 3
     df['cumvol']   = df.groupby('date')['Volume'].cumsum()
@@ -133,97 +114,100 @@ def build_live_features(df):
     return features
 
 
-def evaluate_position(pos_id, position):
-    """Pull fresh data, build features, run model, decide hold/exit."""
-    df = fetch_recent_bars()
-    if df is None or len(df) < 25:
-        log_event({"event": "eval_skipped", "reason": "insufficient_data", "pos_id": pos_id})
-        return
+def evaluate_all_positions():
+    """Called every time a new bar arrives. Re-evaluates every open position."""
+    with data_lock:
+        if len(bar_buffer) < 25:
+            return
+        df = pd.DataFrame(bar_buffer)
+        positions_snapshot = dict(open_positions)
 
     features = build_live_features(df)
     latest = features.dropna().iloc[-1:]
     if latest.empty:
         return
-
     X = latest[FEATURE_COLS]
-    model = model_long if position['direction'] == 'long' else model_short
-    proba = model.predict_proba(X)[0][1]  # probability of "good" outcome continuing
+    current_price = float(df.iloc[-1]['Close'])
 
-    record = {
-        "event": "model_eval",
-        "pos_id": pos_id,
-        "direction": position['direction'],
-        "confidence": float(proba),
-        "current_price": float(df.iloc[-1]['Close']),
-        "entry_price": position['entry_price'],
-        "bars_held": position['bars_held']
-    }
+    for pos_id, pos in positions_snapshot.items():
+        model = model_long if pos['direction'] == 'long' else model_short
+        proba = float(model.predict_proba(X)[0][1])
 
-    # simple decision rule: exit if confidence drops below 0.4
-    if proba < 0.4:
-        record["decision"] = "EXIT_RECOMMENDED"
-        with positions_lock:
-            if pos_id in open_positions:
-                del open_positions[pos_id]
-    else:
-        record["decision"] = "HOLD"
-        with positions_lock:
-            if pos_id in open_positions:
-                open_positions[pos_id]['bars_held'] += 1
+        record = {
+            "event": "model_eval",
+            "pos_id": pos_id,
+            "direction": pos['direction'],
+            "confidence": proba,
+            "current_price": current_price,
+            "entry_price": pos['entry_price'],
+            "bars_held": pos['bars_held']
+        }
 
-    log_event(record)
+        if proba < 0.4:
+            record["decision"] = "EXIT_RECOMMENDED"
+            with data_lock:
+                if pos_id in open_positions:
+                    del open_positions[pos_id]
+        else:
+            record["decision"] = "HOLD"
+            with data_lock:
+                if pos_id in open_positions:
+                    open_positions[pos_id]['bars_held'] += 1
 
-
-def polling_loop():
-    """Runs every 5 minutes, evaluates all open positions."""
-    while True:
-        time.sleep(300)
-        with positions_lock:
-            positions_snapshot = dict(open_positions)
-        for pos_id, pos in positions_snapshot.items():
-            evaluate_position(pos_id, pos)
+        log_event(record)
 
 
 @app.route('/webhook', methods=['POST'])
 def receive_signal():
-    data = request.get_json(force=True, silent=True)
-    if data is None:
-        raw = request.data.decode('utf-8')
+    raw = request.data.decode('utf-8')
+    try:
+        data = json.loads(raw)
+    except Exception:
         data = {"raw": raw}
 
-    record = {"received_at": datetime.utcnow().isoformat(), "payload": data}
-    log_event(record)
+    log_event({"received_at": datetime.now(timezone.utc).isoformat(), "payload": data})
 
-    text = str(data.get("text", data.get("raw", ""))).upper()
+    msg_type = data.get("type", "")
 
-    if "LONG" in text and "GO" in text:
-        pos_id = f"long_{int(time.time())}"
-        entry_df = fetch_recent_bars(minutes_back=15)
-        entry_price = float(entry_df.iloc[-1]['Close']) if entry_df is not None and len(entry_df) > 0 else None
-        with positions_lock:
+    if msg_type == "bar":
+        bar = {
+            "datetime": pd.to_datetime(int(data["time"]), unit='s'),
+            "Open": float(data["open"]),
+            "High": float(data["high"]),
+            "Low": float(data["low"]),
+            "Close": float(data["close"]),
+            "Volume": float(data["volume"])
+        }
+        with data_lock:
+            bar_buffer.append(bar)
+            if len(bar_buffer) > MAX_BUFFER:
+                bar_buffer.pop(0)
+        evaluate_all_positions()
+
+    elif msg_type == "long":
+        pos_id = f"long_{int(datetime.now(timezone.utc).timestamp())}"
+        with data_lock:
             open_positions[pos_id] = {
                 "direction": "long",
-                "entry_time": datetime.utcnow().isoformat(),
-                "entry_price": entry_price,
+                "entry_time": datetime.now(timezone.utc).isoformat(),
+                "entry_price": float(data.get("price", 0)),
                 "bars_held": 0
             }
-        log_event({"event": "position_opened", "pos_id": pos_id, "direction": "long", "entry_price": entry_price})
+        log_event({"event": "position_opened", "pos_id": pos_id, "direction": "long", "entry_price": data.get("price")})
 
-    elif "SHORT" in text and "GO" in text:
-        pos_id = f"short_{int(time.time())}"
-        entry_df = fetch_recent_bars(minutes_back=15)
-        entry_price = float(entry_df.iloc[-1]['Close']) if entry_df is not None and len(entry_df) > 0 else None
-        with positions_lock:
+    elif msg_type == "short":
+        pos_id = f"short_{int(datetime.now(timezone.utc).timestamp())}"
+        with data_lock:
             open_positions[pos_id] = {
                 "direction": "short",
-                "entry_time": datetime.utcnow().isoformat(),
-                "entry_price": entry_price,
+                "entry_time": datetime.now(timezone.utc).isoformat(),
+                "entry_price": float(data.get("price", 0)),
                 "bars_held": 0
             }
-        log_event({"event": "position_opened", "pos_id": pos_id, "direction": "short", "entry_price": entry_price})
+        log_event({"event": "position_opened", "pos_id": pos_id, "direction": "short", "entry_price": data.get("price")})
 
-    elif "EXIT" in text:
-        log_event({"event": "pinescript_exit_signal", "note": "reference only, not acted on"})
+    elif msg_type in ("exit_long", "exit_short"):
+        log_event({"event": "pinescript_exit_signal", "note": "reference only, not acted on", "data": data})
 
     return jsonify({"status": "received"}), 200
 
@@ -235,12 +219,15 @@ def home():
 
 @app.route('/positions')
 def view_positions():
-    with positions_lock:
+    with data_lock:
         return jsonify(open_positions)
 
 
-# start the background polling thread once, at import time
-threading.Thread(target=polling_loop, daemon=True).start()
+@app.route('/buffer')
+def view_buffer():
+    with data_lock:
+        return jsonify(len(bar_buffer))
+
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
