@@ -68,8 +68,9 @@ def build_live_features(df):
     df = df.copy()
     df['date'] = df['datetime'].dt.date
     df['tp'] = (df['High'] + df['Low'] + df['Close']) / 3
+    df['tpvol'] = df['tp'] * df['Volume']
     df['cumvol']   = df.groupby('date')['Volume'].cumsum()
-    df['cumtpvol'] = df.groupby('date').apply(lambda x: (x['tp'] * x['Volume']).cumsum()).reset_index(level=0, drop=True)
+    df['cumtpvol'] = df.groupby('date')['tpvol'].cumsum()
     df['vwap']     = df['cumtpvol'] / df['cumvol']
     features['price_vs_vwap'] = (df['Close'] - df['vwap']) / df['Close']
 
