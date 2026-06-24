@@ -10,6 +10,7 @@ from xgboost import XGBClassifier
 app = Flask(__name__)
 
 LOG_FILE = "signals_log.jsonl"
+BAR_FILE = "bars_log.jsonl"
 
 model_long = XGBClassifier()
 model_long.load_model("model_long_intraday.json")
@@ -183,6 +184,8 @@ def receive_signal():
             bar_buffer.append(bar)
             if len(bar_buffer) > MAX_BUFFER:
                 bar_buffer.pop(0)
+        with open(BAR_FILE, "a") as f:
+            f.write(json.dumps({"datetime": str(bar["datetime"]), "Open": bar["Open"], "High": bar["High"], "Low": bar["Low"], "Close": bar["Close"], "Volume": bar["Volume"]}) + "\n")
         evaluate_all_positions()
 
     elif msg_type == "long":

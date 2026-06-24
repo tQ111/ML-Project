@@ -9,7 +9,7 @@ if not api_key:
     raise ValueError("POLYGON_API_KEY not found - check that the Codespaces secret is set correctly")
 
 ticker = "SPY"
-multiplier = 5  # 5-minute bars
+multiplier = 5
 timespan = "minute"
 start_date = "2023-01-01"
 end_date = "2024-12-31"
@@ -24,7 +24,6 @@ while next_url:
     if next_url == url:
         response = requests.get(next_url, params=params)
     else:
-        # next_url from polygon doesn't include the key, so add it explicitly
         response = requests.get(next_url, params={"apiKey": api_key})
 
     data = response.json()
