@@ -25,5 +25,5 @@ jobs:
           git config user.name "GitHub Action"
           mkdir -p data
           git add data/
-          git diff --staged --quiet || git commit -m "auto: sync trading data $(date -u '+%Y-%m-%d %H:%M UTC')"
+          git diff --staged --quiet || git commit -m "auto: sync trading data $(TZ='America/New_York' date '+%Y-%m-%d %I:%M %p EST')"
           git push
