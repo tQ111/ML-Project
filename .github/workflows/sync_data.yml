@@ -1,0 +1,29 @@
+name: Sync Trading Data
+
+on:
+  schedule:
+    - cron: '0 14-21 * * 1-5'  # every hour 9am-4pm ET (14-21 UTC), Mon-Fri
+  workflow_dispatch:  # allows manual trigger
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Fetch data from Render
+        run: |
+          curl -s https://tradingml-u4lk.onrender.com/export_bars > data/bars_log.jsonl
+          curl -s https://tradingml-u4lk.onrender.com/export_signals > data/signals_log.jsonl
+
+      - name: Commit and push if changed
+        run: |
+          git config user.email "action@github.com"
+          git config user.name "GitHub Action"
+          mkdir -p data
+          git add data/
+          git diff --staged --quiet || git commit -m "auto: sync trading data $(date -u '+%Y-%m-%d %H:%M UTC')"
+          git push

@@ -231,6 +231,21 @@ def view_positions():
 def view_buffer():
     with data_lock:
         return jsonify(len(bar_buffer))
+@app.route('/export_bars')
+def export_bars():
+    try:
+        with open(BAR_FILE, "r") as f:
+            return f.read(), 200, {'Content-Type': 'application/json'}
+    except FileNotFoundError:
+        return "", 200
+
+@app.route('/export_signals')
+def export_signals():
+    try:
+        with open(LOG_FILE, "r") as f:
+            return f.read(), 200, {'Content-Type': 'application/json'}
+    except FileNotFoundError:
+        return "", 200
 
 
 if __name__ == '__main__':
