@@ -1,28 +1,19 @@
-{"received_at": "2026-06-26T18:30:03.545707+00:00", "payload": {"raw": "TPC-2: BAR"}}
-{"received_at": "2026-06-26T18:35:04.289133+00:00", "payload": {"raw": "TPC-2: BAR"}}
-{"received_at": "2026-06-26T18:40:06.835523+00:00", "payload": {"raw": "TPC-2: BAR"}}
-{"received_at": "2026-06-26T18:45:01.210699+00:00", "payload": {"raw": "TPC-2: BAR"}}
-{"received_at": "2026-06-26T18:50:02.505651+00:00", "payload": {"raw": "TPC-2: SHORT \u2014 buy puts"}}
-{"received_at": "2026-06-26T18:50:03.631643+00:00", "payload": {"raw": "TPC-2: BAR"}}
-{"received_at": "2026-06-26T18:55:02.351943+00:00", "payload": {"raw": "TPC-2: BAR"}}
-{"received_at": "2026-06-26T19:00:19.660155+00:00", "payload": {"raw": "TPC-2: BAR"}}
-{"received_at": "2026-06-26T19:05:03.987783+00:00", "payload": {"raw": "TPC-2: BAR"}}
-{"received_at": "2026-06-26T19:10:01.907592+00:00", "payload": {"raw": "TPC-2: BAR"}}
-{"received_at": "2026-06-26T19:15:04.860297+00:00", "payload": {"raw": "TPC-2: BAR"}}
-{"received_at": "2026-06-26T19:20:03.032611+00:00", "payload": {"raw": "TPC-2: BAR"}}
-{"received_at": "2026-06-26T19:25:01.014669+00:00", "payload": {"raw": "TPC-2: BAR"}}
-{"received_at": "2026-06-26T19:30:04.076918+00:00", "payload": {"raw": "TPC-2: BAR"}}
-{"received_at": "2026-06-26T19:35:01.740800+00:00", "payload": {"raw": "TPC-2: BAR"}}
-{"received_at": "2026-06-26T19:40:01.694220+00:00", "payload": {"raw": "TPC-2: BAR"}}
-{"received_at": "2026-06-26T19:45:08.525050+00:00", "payload": {"raw": "TPC-2: BAR"}}
-{"received_at": "2026-06-26T19:50:01.540100+00:00", "payload": {"raw": "TPC-2: BAR"}}
-{"received_at": "2026-06-26T19:55:02.496072+00:00", "payload": {"raw": "TPC-2: EXIT current position"}}
-{"received_at": "2026-06-26T19:55:05.485485+00:00", "payload": {"raw": "TPC-2: BAR"}}
-{"received_at": "2026-06-26T20:00:07.756574+00:00", "payload": {"raw": "TPC-2: SHORT \u2014 buy puts"}}
-{"received_at": "2026-06-26T20:00:19.893907+00:00", "payload": {"raw": "TPC-2: BAR"}}
-{"received_at": "2026-06-26T20:05:06.437994+00:00", "payload": {"raw": "TPC-2: BAR"}}
-{"received_at": "2026-06-26T20:10:03.678271+00:00", "payload": {"raw": "TPC-2: BAR"}}
-{"received_at": "2026-06-26T20:15:02.834460+00:00", "payload": {"raw": "TPC-2: BAR"}}
-{"received_at": "2026-06-26T20:15:02.925146+00:00", "payload": {"raw": "TPC-2: EXIT current position"}}
-{"received_at": "2026-06-26T20:20:08.530158+00:00", "payload": {"raw": "TPC-2: BAR"}}
-{"received_at": "2026-06-26T20:25:07.017665+00:00", "payload": {"raw": "TPC-2: BAR"}}
+{"received_at": "2026-06-26T20:30:08.796011+00:00", "payload": {"raw": "TPC-2: BAR"}}
+{"received_at": "2026-06-26T20:35:09.267183+00:00", "payload": {"raw": "TPC-2: BAR"}}
+{"received_at": "2026-06-26T20:40:06.014227+00:00", "payload": {"raw": "TPC-2: BAR"}}
+{"received_at": "2026-06-26T20:45:08.485553+00:00", "payload": {"raw": "TPC-2: BAR"}}
+{"received_at": "2026-06-26T20:50:36.767920+00:00", "payload": {"raw": "TPC-2: BAR"}}
+{"received_at": "2026-06-26T20:55:15.974577+00:00", "payload": {"raw": "TPC-2: BAR"}}
+{"received_at": "2026-06-26T21:01:08.672910+00:00", "payload": {"raw": "TPC-2: BAR"}}
+{"received_at": "2026-06-26T21:05:11.892479+00:00", "payload": {"raw": "TPC-2: BAR"}}
+{"received_at": "2026-06-26T21:10:02.757946+00:00", "payload": {"raw": "TPC-2: BAR"}}
+{"received_at": "2026-06-26T21:15:03.988326+00:00", "payload": {"raw": "TPC-2: BAR"}}
+{"received_at": "2026-06-26T21:20:14.387876+00:00", "payload": {"raw": "TPC-2: BAR"}}
+{"received_at": "2026-06-26T21:26:00.345142+00:00", "payload": {"raw": "TPC-2: BAR"}}
+{"received_at": "2026-06-26T21:30:55.153740+00:00", "payload": {"raw": "TPC-2: BAR"}}
+{"received_at": "2026-06-26T21:35:41.676246+00:00", "payload": {"raw": "TPC-2: BAR"}}
+{"received_at": "2026-06-26T21:40:53.814815+00:00", "payload": {"raw": "TPC-2: BAR"}}
+{"received_at": "2026-06-26T21:45:12.575821+00:00", "payload": {"raw": "TPC-2: BAR"}}
+{"received_at": "2026-06-26T21:50:29.238558+00:00", "payload": {"raw": "TPC-2: BAR"}}
+{"received_at": "2026-06-26T21:55:14.828837+00:00", "payload": {"raw": "TPC-2: BAR"}}
+{"received_at": "2026-06-26T22:00:26.843276+00:00", "payload": {"raw": "TPC-2: BAR"}}
